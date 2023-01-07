@@ -318,6 +318,52 @@ export class Modem {
 		};
 	}
 
+	async getRegisteredNetwork(prio = false) {
+		const response = await simplifyResponse(this.executeATCommand('AT+COPS?', prio));
+
+		if (!response.toUpperCase().startsWith('+COPS: ') || response.toUpperCase().includes('ERROR')) {
+			throw new Error(`serialport-gsm/${this.port.path}: The network signal could not be read!`);
+		}
+
+		const splitedResponse = response.substring(7).split(',');
+		const format = splitedResponse[1];
+		const data = splitedResponse[2];
+
+		return {
+			mode: splitedResponse[0],
+			name: data?.length > 0 && format === '0' ? data.replace(/"/g, '') : undefined,
+			shortName: data?.length > 0 && format === '1' ? data.replace(/"/g, '') : undefined,
+			numeric: data?.length > 0 && format === '2' ? data.replace(/"/g, '') : undefined
+		};
+	}
+
+	async getAvailableNetworks(prio = false) {
+		const response = await simplifyResponse(this.executeATCommand('AT+COPS=?', prio, 60000));
+
+		if (!response.toUpperCase().startsWith('+COPS: ') || response.toUpperCase().includes('ERROR')) {
+			throw new Error(`serialport-gsm/${this.port.path}: The network signal could not be read!`);
+		}
+
+		const result = [];
+
+		for (const signal of response?.match(/\((\d,".*?")\)(?!")/g) || []) {
+			const data = signal.substring(1, signal.length - 2).split(',');
+
+			const name = data[1]?.replace(/"/g, '');
+			const shortName = data[2]?.replace(/"/g, '');
+			const numeric = data[3]?.replace(/"/g, '');
+
+			result.push({
+				status: data[0],
+				name: name || '',
+				shortName: shortName !== undefined && shortName.length > 0 ? shortName : undefined,
+				numeric: numeric !== undefined && numeric.length > 0 ? numeric : undefined
+			});
+		}
+
+		return result;
+	}
+
 	async checkSimMemory(prio = false): Promise<SimMemoryInformation> {
 		const response = await this.executeATCommand('AT+CPMS="SM"', prio);
 
