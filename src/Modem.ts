@@ -1,4 +1,4 @@
-import * as pdu from '@killerjulian/node-pdu';
+import { Deliver, parse as parsePdu, Report, Submit, utils as pduUtils } from '@killerjulian/node-pdu';
 import { SerialPort } from 'serialport';
 import {
 	CommandResponse,
@@ -243,10 +243,14 @@ export class Modem {
 		return { status: 'OK' };
 	}
 
-	async sendSms(number: string, message: string, flashSms = false, prio = false): Promise<SendSmsSuccess> {
-		const submit = new pdu.Submit(number, message);
+	async sendSms(number: string, message: string, flashSms = false, prio = false) {
+		const submit = new Submit(number, message);
 		submit.dataCodingScheme.setUseMessageClass(flashSms);
 
+		return await this.sendPdu(submit, prio);
+	}
+
+	async sendPdu<T extends Submit | Deliver>(pdu: T, prio = false) {
 		const checkReponse = (response: CommandResponse | Error) => {
 			if (response instanceof Error || resultCode(response.pop() || '') !== 'OK') {
 				throw new Error(`serialport-gsm/${this.port.path}: Failed to send SMS!`);
@@ -254,11 +258,11 @@ export class Modem {
 		};
 
 		const cmdSequence: CmdStack = {
-			cmds: submit
-				.getParts()
-				.flatMap((part) => [
-					new Command(`AT+CMGS=${part.toString(submit).length / 2 - 1}`, 250, undefined, false),
-					new Command(part.toString(submit) + '\x1a', 10000, checkReponse)
+			cmds: pdu
+				.getPartStrings()
+				.flatMap((partString) => [
+					new Command(`AT+CMGS=${partString.length / 2 - 1}`, 250, undefined, false),
+					new Command(partString + '\x1a', 10000, checkReponse)
 				]),
 			cancelOnFailure: true
 		};
@@ -267,13 +271,16 @@ export class Modem {
 			cmdSequence.onFinish = () => resolve(true);
 
 			cmdSequence.onFailed = (error) => {
-				const result: SendSmsFailed = {
+				const result: SendSmsFailed<T> = {
 					success: false,
 					data: {
-						message,
-						recipient: number,
-						alert: flashSms,
-						pdu: submit
+						message: pdu.data.getText(),
+						recipient:
+							pdu.address.type.type === pduUtils.SCAType.TYPE_INTERNATIONAL && pdu.address.phone !== null
+								? `+${pdu.address.phone}`
+								: pdu.address.phone || '',
+						alert: pdu.dataCodingScheme.useMessageClass,
+						pdu: pdu
 					},
 					error
 				};
@@ -285,13 +292,16 @@ export class Modem {
 			this.cmdHandler.pushToQueue(cmdSequence, prio);
 		});
 
-		const result: SendSmsSuccess = {
+		const result: SendSmsSuccess<T> = {
 			success: true,
 			data: {
-				message,
-				recipient: number,
-				alert: flashSms,
-				pdu: submit
+				message: pdu.data.getText(),
+				recipient:
+					pdu.address.type.type === pduUtils.SCAType.TYPE_INTERNATIONAL && pdu.address.phone !== null
+						? `+${pdu.address.phone}`
+						: pdu.address.phone || '',
+				alert: pdu.dataCodingScheme.useMessageClass,
+				pdu: pdu
 			}
 		};
 
@@ -520,14 +530,14 @@ export class Modem {
 			}
 
 			if (preInformation && /[0-9A-Fa-f]{15}/g.test(part)) {
-				const pduMessage = pdu.parse(part);
+				const pduMessage = parsePdu(part);
 
 				return {
 					index: preInformation.index,
 					status: preInformation.status,
 					sender: pduMessage.address.phone || undefined,
-					message: pduMessage instanceof pdu.Report ? '' : pduMessage.data.getText(),
-					timestamp: pduMessage instanceof pdu.Deliver ? pduMessage.serviceCenterTimeStamp.getIsoString() : undefined,
+					message: pduMessage instanceof Report ? '' : pduMessage.data.getText(),
+					timestamp: pduMessage instanceof Deliver ? pduMessage.serviceCenterTimeStamp.getIsoString() : undefined,
 					pdu: pduMessage
 				};
 			}
@@ -570,14 +580,14 @@ export class Modem {
 			}
 
 			if (preInformation && /[0-9A-Fa-f]{15}/g.test(part)) {
-				const pduMessage = pdu.parse(part);
+				const pduMessage = parsePdu(part);
 
 				result.push({
 					index: preInformation.index,
 					status: preInformation.status,
 					sender: pduMessage.address.phone || undefined,
-					message: pduMessage instanceof pdu.Report ? '' : pduMessage.data.getText(),
-					timestamp: pduMessage instanceof pdu.Deliver ? pduMessage.serviceCenterTimeStamp.getIsoString() : undefined,
+					message: pduMessage instanceof Report ? '' : pduMessage.data.getText(),
+					timestamp: pduMessage instanceof Deliver ? pduMessage.serviceCenterTimeStamp.getIsoString() : undefined,
 					pdu: pduMessage
 				});
 
@@ -590,7 +600,7 @@ export class Modem {
 			const notConnectable = [];
 
 			for (const item of result) {
-				if (item.pdu instanceof pdu.Report) {
+				if (item.pdu instanceof Report) {
 					notConnectable.push(item);
 					continue;
 				}
@@ -603,7 +613,7 @@ export class Modem {
 
 				const existingReference = pduSms.get(pointer);
 
-				if (!existingReference || existingReference.pdu instanceof pdu.Report) {
+				if (!existingReference || existingReference.pdu instanceof Report) {
 					pduSms.set(pointer, item);
 					continue;
 				}
