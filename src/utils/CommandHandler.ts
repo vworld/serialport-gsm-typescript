@@ -1,15 +1,18 @@
 import { utils as pduUtils } from 'node-pdu';
-import { SerialPort } from 'serialport';
 import { Modem } from '../Modem';
-import { CommandResponse } from '../types';
 import { Command } from './Command';
+import { Communicator } from './Communicator';
 import { Events } from './Events';
+import { CommandResponse } from './types';
 import { CmdStack } from './utils';
 
+/**
+ * Handles the execution and processing of AT commands for the modem.
+ */
 export class CommandHandler {
 	// references
 	private readonly modem: Modem;
-	private readonly serialPort: SerialPort;
+	private readonly communicator: Communicator;
 	private readonly events: Events;
 
 	// queued commands
@@ -24,20 +27,29 @@ export class CommandHandler {
 	private receivedData = '';
 	private receivedCmdResponse: CommandResponse = [];
 
-	constructor(modem: Modem, serialPort: SerialPort, events: Events) {
+	constructor(modem: Modem, communicator: Communicator, events: Events) {
 		this.modem = modem;
-		this.serialPort = serialPort;
+		this.communicator = communicator;
 		this.events = events;
 
-		this.serialPort.on('data', (data) => this.dataReceived(data));
+		this.communicator.setOnResiveFunc((data) => this.dataReceived(data));
 	}
 
 	/*
-	 * sending commands
+	 * ================================================
+	 *            Sending commands to modem
+	 * ================================================
 	 */
 
+	/**
+	 * Executes the next command in the queue.
+	 * Locks the execution to prevent concurrent command execution.
+	 * Resolves once the command is executed.
+	 *
+	 * @returns The executed command or `undefined` if no command is available.
+	 */
 	private async executeNextCmd() {
-		if (this.isLocked || !this.serialPort.isOpen) {
+		if (this.isLocked || !this.communicator.isConnected) {
 			return;
 		}
 
@@ -73,6 +85,13 @@ export class CommandHandler {
 		return item;
 	}
 
+	/**
+	 * Executes a single AT command.
+	 * Resolves with the command response or an error if the command times out or encounters an issue.
+	 *
+	 * @param cmd The AT command to execute.
+	 * @returns The command response or an error if the command fails.
+	 */
 	private async executeCMD(cmd: Command) {
 		const result = await new Promise((resolve: (result: CommandResponse | Error) => void) => {
 			if (cmd.deprecated) {
@@ -82,7 +101,7 @@ export class CommandHandler {
 			const write = `${cmd.ATCommand}\r`;
 
 			this.events.emit('onWriteToModem', write);
-			this.serialPort.write(write);
+			this.communicator.write(write);
 
 			if (cmd.awaitResponse === false) {
 				return setTimeout(() => resolve([]), cmd.timeout);
@@ -119,11 +138,19 @@ export class CommandHandler {
 	}
 
 	/*
-	 * receiving data
+	 * ================================================
+	 *            Receiving data from modem
+	 * ================================================
 	 */
 
-	private dataReceived(received: Buffer) {
-		this.receivedData += received.toString();
+	/**
+	 * Handles the data received from the modem.
+	 * Processes the received data, emits events, and triggers command responses.
+	 *
+	 * @param received The received data from the modem.
+	 */
+	private dataReceived(received: string) {
+		this.receivedData += received;
 		const parts = this.receivedData.split('\r\n');
 		this.receivedData = parts.pop() || '';
 
@@ -216,9 +243,14 @@ export class CommandHandler {
 	}
 
 	/*
-	 * public functions
+	 * ================================================
+	 *                 Public functions
+	 * ================================================
 	 */
 
+	/**
+	 * Starts processing the command queue.
+	 */
 	startProcessing() {
 		if (this.interval !== null) {
 			return;
@@ -227,6 +259,9 @@ export class CommandHandler {
 		this.interval = setInterval(() => this.executeNextCmd().catch(() => (this.isLocked = false)), 10);
 	}
 
+	/**
+	 * Stops processing the command queue.
+	 */
 	stopProcessing() {
 		if (this.interval === null) {
 			return;
@@ -236,6 +271,12 @@ export class CommandHandler {
 		this.interval = null;
 	}
 
+	/**
+	 * Adds a command or command stack to the processing queue.
+	 *
+	 * @param cmd The command or command stack to add to the queue.
+	 * @param prio If true, adds the command to the priority queue; otherwise, adds it to the regular queue.
+	 */
 	pushToQueue(cmd: Command | CmdStack, prio = false) {
 		if (prio) {
 			this.prioQueue.push(cmd);
