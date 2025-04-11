@@ -28,7 +28,8 @@
 		"lint": "yarn lint:format && yarn lint:code",
 		"lint:code": "eslint src --ext .ts",
 		"lint:format": "prettier --check .",
-		"prepack": "yarn build:lib"
+		"prepack": "yarn build:lib",
+		"prepare": "yarn build:lib"
 	},
 	"engines": {
 		"node": ">=16.0.0"
