@@ -818,7 +818,7 @@ export class Modem {
 		this.events.once(eventName, listener);
 	}
 
-	removeListener(eventName: keyof EventTypes, listener: (...args: unknown[]) => void) {
+	removeListener<T extends keyof EventTypes>(eventName: T, listener: EventTypes[T]) {
 		this.events.removeListener(eventName, listener);
 	}
 }
