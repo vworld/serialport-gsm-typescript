@@ -14,8 +14,9 @@ export class Modem {
 	private readonly communicator: Communicator;
 	private readonly events = new Events();
 	private readonly cmdHandler: CommandHandler;
+	private readonly commandTimeout: number;
 
-	constructor(communicator: Communicator, options: Partial<ModemOptions> = {}) {
+	constructor(communicator: Communicator, options: Partial<ModemOptions> = {}, commandTimeout: number = 3000) {
 		this.options = {
 			pinCode: options.pinCode ?? null,
 			deleteSmsOnReceive: options.deleteSmsOnReceive ?? false,
@@ -27,6 +28,7 @@ export class Modem {
 
 		this.communicator = communicator;
 		this.cmdHandler = new CommandHandler(this, this.communicator, this.events);
+		this.commandTimeout = commandTimeout;
 
 		this.on('onNewSms', (id) => this.options.deleteSmsOnReceive && this.deleteSms(id).catch());
 	}
@@ -232,7 +234,7 @@ export class Modem {
 	async executeATCommand(command: string, prio = false, cmdtimeout?: number) {
 		return await new Promise((resolve: (response: CommandResponse) => void, reject: (error: Error) => void) => {
 			this.cmdHandler.pushToQueue(
-				new Command(command, cmdtimeout, (result) => {
+				new Command(command, cmdtimeout ?? this.commandTimeout, (result) => {
 					if (result instanceof Error) {
 						reject(result);
 						return;
