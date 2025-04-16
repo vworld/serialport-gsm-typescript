@@ -221,11 +221,14 @@ export class CommandHandler {
 
 				if (splitted_newpart.length > 1) {
 					const decodable = /"(.*?)"/g.exec(splitted_newpart[1]);
-
-					if (decodable !== null && decodable.length > 1) {
+					const encoding = /(\d+)/.exec(splitted_newpart[2]);
+					if (decodable !== null && decodable.length > 1 && (!encoding || encoding[1] !== '15')) {
 						text = pduUtils.Helper.decode16Bit(decodable[1]);
 					} else {
 						text = splitted_newpart[1];
+						if (text.startsWith('"') && text.endsWith('"')) {
+							text = text.slice(1, -1);
+						}
 					}
 				}
 
