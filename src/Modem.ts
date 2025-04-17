@@ -559,7 +559,7 @@ export class Modem {
 			throw new ModemError(this, 'The own phone number could not be read!');
 		}
 
-		const regExp = /"(.*?)"/g;
+		const regExp = /"(.*?)"/;
 		const splitedResponse = response.split(',');
 
 		const name = regExp.exec(splitedResponse[0] || '')?.[1];
