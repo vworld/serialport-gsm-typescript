@@ -565,7 +565,8 @@ export class Modem {
 		const name = regExp.exec(splitedResponse[0] || '')?.[1];
 		const phoneNumber = regExp.exec(splitedResponse[1] || '')?.[1];
 
-		if (name === undefined || phoneNumber === undefined) {
+		// some operators do not return names. Parsing of phone numbers is responsibility of the caller.
+		if (phoneNumber === undefined) {
 			throw new ModemError(this, 'The own phone number could not be parsed!');
 		}
 
