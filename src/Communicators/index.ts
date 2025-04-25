@@ -1,1 +1,1 @@
-export * as SerialPortCommunicator from './SerialPortCommunicator';
+export { SerialPortCommunicator, SerialPortOptions } from './SerialPortCommunicator';
