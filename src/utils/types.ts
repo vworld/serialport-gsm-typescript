@@ -64,3 +64,5 @@ export type PduSms = {
  */
 
 export { Communicator } from './Communicator';
+
+export * from '@serialport/bindings-interface';
