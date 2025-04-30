@@ -2,6 +2,7 @@ import { AutoDetectTypes } from '@serialport/bindings-cpp';
 import { SerialPort } from 'serialport';
 import { SerialPortOpenOptions } from 'serialport/dist/index';
 import { Communicator } from '../utils/Communicator';
+import { PortInfo } from '@serialport/bindings-interface';
 
 /**
  * Represents a communicator using the SerialPort library for communication with hardware devices.
@@ -9,6 +10,7 @@ import { Communicator } from '../utils/Communicator';
 export class SerialPortCommunicator implements Communicator {
 	private readonly device: string;
 	private readonly serialPort: SerialPort;
+	private _lastWriteTimestamp?: number;
 
 	constructor(device: string, options: Partial<SerialPortOptions> = {}) {
 		const serialPortOptions: SerialPortOptions = Object.assign(
@@ -58,6 +60,10 @@ export class SerialPortCommunicator implements Communicator {
 	 */
 	get isConnected() {
 		return this.serialPort.isOpen;
+	}
+
+	get lastWriteTimestamp(){
+		return this._lastWriteTimestamp;
 	}
 
 	/*
@@ -111,6 +117,7 @@ export class SerialPortCommunicator implements Communicator {
 	 * @param data The data to be written.
 	 */
 	async write(data: string) {
+		this._lastWriteTimestamp = Date.now();
 		this.serialPort.write(data);
 	}
 
@@ -120,7 +127,7 @@ export class SerialPortCommunicator implements Communicator {
 	 *
 	 * @returns A promise resolving to an array of available serial ports.
 	 */
-	static async listDevices() {
+	static async listDevices(): Promise<PortInfo[]> {
 		return SerialPort.list();
 	}
 }
