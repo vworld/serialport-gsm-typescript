@@ -74,22 +74,6 @@ export class Modem {
 	 */
 
 	/**
-	 * Checks if the modem requires a PIN for operation.
-	 *
-	 * @param prio Whether this action should be prioritised in the command queue.
-	 * @returns True if a PIN is required, false otherwise.
-	 */
-	private async checkPinRequired(prio = false) {
-		const response = await simplifyResponse(this.executeATCommand('AT+CPIN?', prio));
-
-		if (!response.toUpperCase().startsWith('+CPIN:') || response.toUpperCase().includes('ERROR')) {
-			throw new ModemError(this, 'Failed to detect if the modem requires a pin!');
-		}
-
-		return !response.toUpperCase().includes('READY');
-	}
-
-	/**
 	 * Enables the Caller Line Identification Presentation (CLIP) feature on the modem, allowing
 	 * the modem to present the caller's number when receiving a call.
 	 *
@@ -188,6 +172,22 @@ export class Modem {
 	 *                 Public functions
 	 * ================================================
 	 */
+
+	/**
+	 * Checks if the modem requires a PIN for operation.
+	 *
+	 * @param prio Whether this action should be prioritised in the command queue.
+	 * @returns True if a PIN is required, false otherwise.
+	 */
+	public async checkPinRequired(prio = false) {
+		const response = await simplifyResponse(this.executeATCommand('AT+CPIN?', prio));
+
+		if (!response.toUpperCase().startsWith('+CPIN:') || response.toUpperCase().includes('ERROR')) {
+			throw new ModemError(this, 'Failed to detect if the modem requires a pin!');
+		}
+
+		return !response.toUpperCase().includes('READY');
+	}
 
 	/**
 	 * Opens the connection to the modem and initiates the connection.
