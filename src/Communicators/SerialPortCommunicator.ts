@@ -3,6 +3,7 @@ import { SerialPort } from 'serialport';
 import { SerialPortOpenOptions } from 'serialport/dist/index';
 import { Communicator } from '../utils/Communicator';
 import { PortInfo } from '@serialport/bindings-interface';
+import { SerialPortEvents } from '../utils/SerialPortEvents';
 
 /**
  * Represents a communicator using the SerialPort library for communication with hardware devices.
@@ -11,6 +12,7 @@ export class SerialPortCommunicator implements Communicator {
 	private readonly device: string;
 	private readonly serialPort: SerialPort;
 	private _lastWriteTimestamp?: number;
+	private serialPortEvents: SerialPortEvents;
 
 	constructor(device: string, options: Partial<SerialPortOptions> = {}) {
 		const serialPortOptions: SerialPortOptions = Object.assign(
@@ -36,7 +38,10 @@ export class SerialPortCommunicator implements Communicator {
 
 		this.device = device;
 		this.serialPort = new SerialPort(serialPortOptions);
-		this.serialPort.on('error', (e) => console.error(e));
+		this.serialPortEvents = new SerialPortEvents();
+		this.serialPort.on('error', (e) => {
+			this.serialPortEvents.emit('onError', e);
+		});
 	}
 
 	/*
