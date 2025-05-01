@@ -36,6 +36,7 @@ export class SerialPortCommunicator implements Communicator {
 
 		this.device = device;
 		this.serialPort = new SerialPort(serialPortOptions);
+		this.serialPort.on('error', (e) => console.error(e));
 	}
 
 	/*
@@ -62,7 +63,7 @@ export class SerialPortCommunicator implements Communicator {
 		return this.serialPort.isOpen;
 	}
 
-	get lastWriteTimestamp(){
+	get lastWriteTimestamp() {
 		return this._lastWriteTimestamp;
 	}
 
